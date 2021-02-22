@@ -1,4 +1,7 @@
-ADRESS_LIST = ['0x05f51aab068caa6ab7eeb672f88c180f67f17ec7',
+"""List of Exchange adresses."""
+
+ADRESS_LIST = [
+'0x05f51aab068caa6ab7eeb672f88c180f67f17ec7',
 '0xf0c80fb9fb22bef8269cb6feb9a51130288a671f',
 '0x94597850916a49b3b152ee374e97260b99249f5b',
 '0x4df5f3610e2471095a130d7d934d551f3dde01ed',
