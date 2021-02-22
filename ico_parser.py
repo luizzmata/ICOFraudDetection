@@ -2,19 +2,12 @@
 
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import Callable, Dict
+from typing import Callable, Dict, List
 from exchange_addresses import ADRESS_LIST
 import pytz
 import requests
 import json
 import time
-import statsmodels.api as sm
-from tensorflow import keras
-from tensorflow.keras.metrics import Recall
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
-import plotly.express as px
-
 
 def _sum_dict_values(d1: dict, 
                      d2: dict,
@@ -89,7 +82,7 @@ def _check_if_holder(
         return False
 
 
-def _get_biggest_holder(dict_cumsum_percentage: Dict) -> Dict:
+def _get_bigbuyer(dict_cumsum_percentage: Dict) -> Dict:
     """Get biggest holder from a dictionary with daily ICO information.
     
     Parameters
@@ -237,20 +230,116 @@ class ICOParser:
             Date column name.
 
         value_column : str (default='VALUE')
+            Name of column to carry values.
 
-        ico_start_date : str=None,
-        dateformat : str='%Y-%m-%d',
-        fraud_flag : int=None,
-        len_time_series : int=60,
-        rolling_window_days : int=3
+        ico_start_date : str (default=None)
+            Start date to consider for ICO.
 
-        Attributes:
-            fraud_flag (int):
-            df (pd.DataFrame):
-            df_resample_day (pd.DataFrame):
-            df_resample_hour (pd.DataFrame):
-            ico_start_date (datetime.date):
-            ico_end_date (datetime.date):
+        dateformat : str (default='%Y-%m-%d')
+            Date format for use when parsing date column.
+
+        fraud_flag : int (default=None)
+            1 for fraud and 0 for reliable ICO.
+
+        len_time_series : int (default=60)
+            Size of the series to extract from data.
+
+        rolling_window_days : int (default=3)
+            Size of rolling windows in days to calculate moving average.
+
+        Attributes
+        ----------
+        len_time_series : int
+            Stored len_time_series parameter.
+
+        fraud_flag : int
+            Stored fraud_flag parameter.
+
+        df : pd.DataFrame
+            Dataframe loaded from path_to_csv parameter.
+
+        date_column : str
+            Stored date_column parameter.
+
+        value_column : str
+            Stored value_column parameter.
+
+        df_resample_day : pd.DataFrame
+            df parameter daily resampled summing value_column.
+
+        ico_start_date : str
+            Stored ico_start_date parameter.
+
+        ico_end_date: str
+            Stored ico_end_date parameter.
+
+        rolling_window_days : int
+            Stored rolling_window_days parameter.
+
+        df_newuser : pd.DataFrame
+            Dataframe filtered for new users.
+
+        df_newuser_resample : pd.DataFrame
+            Dataframe filtered for new users resampled on a daily basis.
+
+        dict_balance : dict
+            Dictionary storing information about balance for each analysed day.
+
+        dict_cumsum_balance : dict
+            Dictionary storing information about balance summing values.
+
+        dict_percentage_holders : dict
+            Dictionary storing information about percentage of stocks for each
+            holder.
+
+        dict_daily_newholders : dict
+            Dictionary storing information about new holders.
+
+        dict_perc_bigbuyer : dict
+            Dictionary storing information about biggest percentage of a holder
+            for each day.
+
+        dict_newuser_ratio : dict
+            Dictionary storing information about ratio between newusers and the
+            rest of the holders daily.
+
+        array_daily_transactions : Sequence
+            Array with information about daily transactions.
+
+        array_perc_newholders : Sequence
+            Array with information about percentage of new holders.
+
+        array_bigbuyer : Sequence
+            Array with information about daily biggest buyers.
+
+        array_newuser : Sequence
+            Array with information about daily new users.
+
+        array_gaslimit : Sequence
+            Array with information about daily gas limit.
+
+        array_daily_transactions_ma : Sequence
+            Array with information about daily transactions calculated using
+            moving average.
+
+        array_perc_newholders_ma : Sequence
+            Array with information about daily percentage of new holders
+            calculated using moving average.
+
+        array_bigbuyer_ma : Sequence
+            Array with information about biggest buyers calculated using moving
+            average.
+
+        array_newuser_ma : Sequence
+            Array with information about daily new users calculated using
+            moving average.
+
+        array_gaslimit_ma : Sequence
+            Array with information about daily gas limit calculated using
+            moving average.
+
+        array_autocorrelation_transactions : Sequence
+            Array with information about daily transactions autocorrelation.
         """
         # Process start_date and end_date
         ico_start_date = (
@@ -269,8 +358,6 @@ class ICOParser:
 
         df = df.loc[df[date_column] <= ico_end_date]
         df_for_resample = df.copy()
-        # df.set_index(date_column, inplace=True)
-
         df_for_resample[date_column] = pd.to_datetime(
             df_for_resample[date_column]
         )
@@ -286,31 +373,31 @@ class ICOParser:
         self.ico_start_date = ico_start_date
         self.ico_end_date = ico_end_date
         self.rolling_window_days = rolling_window_days
-
-        self.df_newbiers = None
-        self.df_newbiers_resample = None
+        self.df_newuser = None
+        self.df_newuser_resample = None
         self.dict_balance = None
         self.dict_cumsum_balance = None
         self.dict_percentage_holders = None
-        self.dict_daily_new_holders = None
-        self.dict_perc_biggest_holder = None
-        self.dict_newbiers_ratio = None
+        self.dict_daily_newholders = None
+        self.dict_perc_bigbuyer = None
+        self.dict_newuser_ratio = None
         self.array_daily_transactions = None
-        self.array_perc_new_holders = None
-        self.array_biggest_holder = None
-        self.array_newbiers = None
-        self.array_gas_ratio = None
+        self.array_perc_newholders = None
+        self.array_bigbuyer = None
+        self.array_newuser = None
+        self.array_gaslimit = None
         self.array_daily_transactions_ma = None
-        self.array_perc_new_holders_ma = None
-        self.array_biggest_holder_ma = None
-        self.array_newbiers_ma = None
-        self.array_gas_ratio_ma = None
+        self.array_perc_newholders_ma = None
+        self.array_bigbuyer_ma = None
+        self.array_newuser_ma = None
+        self.array_gaslimit_ma = None
         self.array_autocorrelation_transactions = None
 
         ## To do:
-        self.df_newbiers_resample_day = None
+        self.df_newuser_resample_day = None
 
     def define_ico_start_date(self):
+        """Filter the dataset based on delta parameter in days."""
         change_series = self.df_resample_day['transactions'].pct_change()
         if self.ico_start_date:
             self.ico_end_date = self.ico_start_date + timedelta(
@@ -335,6 +422,15 @@ class ICOParser:
                     break
 
     def get_array_autocorrelation_transactions(self, nlags=60):
+        """Get array of autocorrelation for transaction series.
+
+        Parameters
+        ----------
+
+        nlags : int (default=60)
+            Size of series to use as reference.
+
+        """
         df_resample_func = self.df_resample_day.reset_index()
         df_resample_func['BLOCK_TIMESTAMP'] = df_resample_func[
             'BLOCK_TIMESTAMP'
@@ -347,6 +443,15 @@ class ICOParser:
         )
 
     def filter_df_for_training_days(self, df):
+        """Filter input dataframe based on ICO start and end parameter.
+
+        Parameters
+        ----------
+
+        df : pd.DataFrame
+            Input dataframe to perform filtering.
+
+        """
         if self.ico_start_date:
             return self.df_resample_day.loc[
                 (self.df_resample_day.index >= self.ico_start_date)
@@ -355,20 +460,22 @@ class ICOParser:
         else:
             print('First define ICO start date.')
 
-    def get_newbiers_dataframe(self):
+    def get_newuser_dataframe(self):
+        """Get dataframe with transactions of new users (nonce 0 or 1)."""
         df_nonce_01 = self.df[self.df.NONCE.isin([1, 0])]
-        list_newbiers = list(df_nonce_01.FROM_ADDRESS_BLOCKCHAIN.unique())
-        self.df_newbiers = self.df[
-            self.df.FROM_ADDRESS_BLOCKCHAIN.isin(list_newbiers)
+        list_newuser = list(df_nonce_01.FROM_ADDRESS_BLOCKCHAIN.unique())
+        self.df_newuser = self.df[
+            self.df.FROM_ADDRESS_BLOCKCHAIN.isin(list_newuser)
         ].reset_index()
-        self.df_newbiers[self.date_column] = pd.to_datetime(
-            self.df_newbiers[self.date_column]
+        self.df_newuser[self.date_column] = pd.to_datetime(
+            self.df_newuser[self.date_column]
         )
-        self.df_newbiers_resample = self.df_newbiers.resample(
+        self.df_newuser_resample = self.df_newuser.resample(
             'D', on=self.date_column
         ).sum()
 
     def get_array_daily_transactions(self):
+        """Get series for number of daily transactions."""
         df_resample_func = self.df_resample_day.reset_index()
         df_resample_func['BLOCK_TIMESTAMP'] = df_resample_func[
             'BLOCK_TIMESTAMP'
@@ -432,6 +539,7 @@ class ICOParser:
         self.dict_balance = dict_balance
 
     def get_cumsum_balance(self):
+        """Calculate cumulative sum for dict_balance."""
         dict_balance = self.dict_balance.copy()
         dict_cumsum_balance = {}
         list_sorted_days = sorted(dict_balance.keys())
@@ -469,23 +577,25 @@ class ICOParser:
             dict_percentage_holders[day] = dict_daily_percentage
         self.dict_percentage_holders = dict_percentage_holders
 
-    def get_biggest_holder_dict(self):
-        self.dict_perc_biggest_holder = _get_biggest_holder(
+    def get_bigbuyer_dict(self):
+        """Filter dictionary of holders for the biggest ones each day."""
+        self.dict_perc_bigbuyer = _get_bigbuyer(
             self.dict_percentage_holders
         )
 
-    def get_biggest_holder_array(self):
-        series_biggest_holder_array = pd.Series(
+    def get_bigbuyer_array(self):
+        """Extract the series biggest holders."""
+        series_bigbuyer_array = pd.Series(
             [
                 round(value[1], 4)
-                for key, value in self.dict_perc_biggest_holder.items()
+                for key, value in self.dict_perc_bigbuyer.items()
             ]
         )
-        self.array_biggest_holder = series_biggest_holder_array.round(
+        self.array_bigbuyer = series_bigbuyer_array.round(
             4
         ).tolist()[-self.len_time_series :]
-        self.array_biggest_holder_ma = (
-            series_biggest_holder_array.rolling(
+        self.array_bigbuyer_ma = (
+            series_bigbuyer_array.rolling(
                 window=self.rolling_window_days
             )
             .mean()
@@ -493,53 +603,53 @@ class ICOParser:
             .tolist()[-self.len_time_series :]
         )
 
-    def get_newbiers_ratio_dict(self):
-        df_ratio = self.df_newbiers_resample / self.df_resample_day
+    def get_newuser_ratio_dict(self):
+        """Extract dictionary of percentage of daily new users."""
+        df_ratio = self.df_newuser_resample / self.df_resample_day
         df_ratio.index = df_ratio.index.astype(str)
         df_ratio.fillna(0, inplace=True)
-        self.dict_newbiers_ratio = df_ratio.transactions.to_dict()
+        self.dict_newuser_ratio = df_ratio.transactions.to_dict()
 
-    def get_newbiers_array(self):
-        series_newbiers = pd.Series(
-            [round(val, 4) for val in list(self.dict_newbiers_ratio.values())]
+    def get_newuser_array(self):
+        """Extract the series new users."""
+        series_newuser = pd.Series(
+            [round(val, 4) for val in list(self.dict_newuser_ratio.values())]
         )
-        self.array_newbiers = series_newbiers.round(4).tolist()[
+        self.array_newuser = series_newuser.round(4).tolist()[
             -self.len_time_series :
         ]
-        self.array_newbiers_ma = (
-            series_newbiers.rolling(window=self.rolling_window_days)
+        self.array_newuser_ma = (
+            series_newuser.rolling(window=self.rolling_window_days)
             .mean()
             .round(4)
             .tolist()[-self.len_time_series :]
         )
 
-    def get_gas_ratio_array(self):
-        if not self.df_newbiers_resample.empty:
-            self.df_newbiers_resample['GAS_RATIO'] = (
-                self.df_newbiers_resample['RECEIPT_GAS_USED']
-                / self.df_newbiers_resample['GAS']
+    def get_gaslimit_array(self):
+    	"""Extract gas limit series."""
+        if not self.df_newuser_resample.empty:
+            self.df_newuser_resample['GAS_RATIO'] = (
+                self.df_newuser_resample['RECEIPT_GAS_USED']
+                / self.df_newuser_resample['GAS']
             )
-            self.df_newbiers_resample.fillna(0, inplace=True)
-            series_gas_ratio = self.df_newbiers_resample.GAS_RATIO
-            self.array_gas_ratio = series_gas_ratio.round(4).tolist()[
+            self.df_newuser_resample.fillna(0, inplace=True)
+            series_gaslimit = self.df_newuser_resample.GAS_RATIO
+            self.array_gaslimit = series_gaslimit.round(4).tolist()[
                 -self.len_time_series :
             ]
-            self.array_gas_ratio_ma = (
-                series_gas_ratio.rolling(window=self.rolling_window_days)
+            self.array_gaslimit_ma = (
+                series_gaslimit.rolling(window=self.rolling_window_days)
                 .mean()
                 .round(4)
                 .tolist()[-self.len_time_series :]
             )
         else:
             print(
-                'self.df_newbiers_resample does not exist.\nPlease run self.get_newbiers_dataframe().'
+                'self.df_newuser_resample does not exist.\nPlease run self.get_newuser_dataframe().'
             )
 
     def get_daily_number_of_new_holder(self, max_date=None):
-        """
-        Alterar lógica para extrair dados da tabela ao invés do
-        dict_cumsum_balance
-        """
+        """Extract dictionary of daily new holders."""
         dict_cumsum = self.dict_cumsum_balance.copy()
         dict_result = {}
         list_sorted_days = sorted(dict_cumsum.keys())
@@ -554,28 +664,30 @@ class ICOParser:
                 'total_users': total_users,
                 'percentage': total_users / max_users,
             }
-        self.dict_daily_new_holders = dict_result
+        self.dict_daily_newholders = dict_result
 
-    def get_array_perc_new_holders(self):
-        series_perc_new_holders = pd.Series(
+    def get_array_perc_newholders(self):
+    	"""Extract series for newholders."""
+        series_perc_newholders = pd.Series(
             [
                 round(value.get('percentage'), 4)
-                for key, value in self.dict_daily_new_holders.items()
+                for key, value in self.dict_daily_newholders.items()
             ]
         )
-        self.array_perc_new_holders = series_perc_new_holders.round(
+        self.array_perc_newholders = series_perc_newholders.round(
             4
         ).tolist()[-self.len_time_series :]
-        self.array_perc_new_holders_ma = (
-            series_perc_new_holders.rolling(window=self.rolling_window_days)
+        self.array_perc_newholders_ma = (
+            series_perc_newholders.rolling(window=self.rolling_window_days)
             .mean()
             .round(4)
             .tolist()[-self.len_time_series :]
         )
 
     def pipeline(self):
-        print('Running method: get_newbiers_dataframe ... ')
-        self.get_newbiers_dataframe()
+        """Call ICOParses instance methods in sequence."""
+        print('Running method: get_newuser_dataframe ... ')
+        self.get_newuser_dataframe()
         print('Running method: get_balance ... ')
         self.get_balance()
         print('Running method: get_cumsum_balance ... ')
@@ -586,24 +698,25 @@ class ICOParser:
         self.get_daily_number_of_new_holder()
         print('Running method: get_array_daily_transactions ... ')
         self.get_array_daily_transactions()
-        print('Running method: get_array_perc_new_holders ... ')
-        self.get_array_perc_new_holders()
-        print('Running method: get_biggest_holder_dict ... ')
-        self.get_biggest_holder_dict()
-        print('Running method: get_biggest_holder_array ... ')
-        self.get_biggest_holder_array()
-        print('Running method: get_newbiers_ratio_dict ... ')
-        self.get_newbiers_ratio_dict()
-        print('Running method: get_newbiers_array ... ')
-        self.get_newbiers_array()
-        print('Running method: get_gas_ratio_array ... ')
-        self.get_gas_ratio_array()
+        print('Running method: get_array_perc_newholders ... ')
+        self.get_array_perc_newholders()
+        print('Running method: get_bigbuyer_dict ... ')
+        self.get_bigbuyer_dict()
+        print('Running method: get_bigbuyer_array ... ')
+        self.get_bigbuyer_array()
+        print('Running method: get_newuser_ratio_dict ... ')
+        self.get_newuser_ratio_dict()
+        print('Running method: get_newuser_array ... ')
+        self.get_newuser_array()
+        print('Running method: get_gaslimit_array ... ')
+        self.get_gaslimit_array()
 
     def pipeline_2_arrays(self):
+        """Call ICOParses instance methods in sequence (version 2)."""
         print('Running method: define_ico_start_date ... ')
         self.define_ico_start_date()
-        print('Running method: get_newbiers_dataframe ... ')
-        self.get_newbiers_dataframe()
+        print('Running method: get_newuser_dataframe ... ')
+        self.get_newuser_dataframe()
         print('Running method: get_balance ... ')
         self.get_balance()
         print('Running method: get_cumsum_balance ... ')
@@ -614,147 +727,14 @@ class ICOParser:
         self.get_daily_number_of_new_holder()
         print('Running method: get_array_daily_transactions ... ')
         self.get_array_daily_transactions()
-        print('Running method: get_array_perc_new_holders ... ')
-        self.get_array_perc_new_holders()
-        # print('Running method: get_biggest_holder_dict ... ')
-        # self.get_biggest_holder_dict()
-        # print('Running method: get_biggest_holder_array ... ')
-        # self.get_biggest_holder_array()
-        print('Running method: get_newbiers_ratio_dict ... ')
-        self.get_newbiers_ratio_dict()
-        print('Running method: get_newbiers_array ... ')
-        self.get_newbiers_array()
-        print('Running method: get_gas_ratio_array ... ')
-        self.get_gas_ratio_array()
+        print('Running method: get_array_perc_newholders ... ')
+        self.get_array_perc_newholders()
+        print('Running method: get_newuser_ratio_dict ... ')
+        self.get_newuser_ratio_dict()
+        print('Running method: get_newuser_array ... ')
+        self.get_newuser_array()
+        print('Running method: get_gaslimit_array ... ')
+        self.get_gaslimit_array()
 
 
 
-class ICODeepTraining:
-    def __init__(
-        self, 
-        dataframe: pd.DataFrame, 
-        target_array: pd.Series, 
-        dl_model: keras.Model, 
-        ann_type: str, 
-        size_array: int
-    ):
-    """
-    Parameters
-    ----------
-    dataframe : pd.DataFrame
-        Dataset with the features to use for training.
-
-    target_array : pd.Series
-        Array with the targets for each sample in training dataset.
-
-    dl_model: keras.Model
-        NeuralNetwork model to use for training defined using Keras.
-
-    ann_type : str
-        Type of neural network architecture ('cnn', 'lstm' or None).
-
-    size_array : int
-        Size of each time series sample.
-
-    Attributes
-    ----------
-    dataframe = dataframe
-    target_encoded = target_array
-    X_tran = None
-    y_train = None
-    X_validation = None
-    y_validation = None
-    dl_model = dl_model
-    ann_type = ann_type
-    size_array = size_array
-    history = None
-    df_validation_predictions = None
-
-
-    """
-
-        self.dataframe = dataframe
-        self.target_encoded = target_array
-        self.X_train = None
-        self.y_train = None
-        self.X_validation = None
-        self.y_validation = None
-        self.dl_model = dl_model
-        self.ann_type = ann_type
-        self.size_array = size_array
-        self.history = None
-        self.df_validation_predictions = None
-
-    def split_train_test(self, test_size=0.3):
-        (
-            self.X_train,
-            self.X_validation,
-            self.y_train,
-            self.y_validation,
-        ) = train_test_split(
-            self.dataframe,
-            self.target_encoded,
-            test_size=test_size,
-            random_state=161,
-        )
-
-        self.X_train = self.X_train.values.astype(float)
-        self.X_validation = self.X_validation.values.astype(float)
-
-        if self.ann_type in ('cnn', 'lstm'):
-            self.X_train = self.X_train.reshape(
-                (len(self.X_train), self.X_train.shape[1], 1)
-            )
-            self.X_validation = self.X_validation.reshape(
-                (len(self.X_validation), self.X_validation.shape[1], 1)
-            )
-
-    def model_summary(self):
-        self.dl_model.summary()
-
-    def train_network(
-        self,
-        loss='binary_crossentropy',
-        optimizer='adam',
-        metrics=['accuracy'],
-        callback=keras.callbacks.EarlyStopping(monitor='loss', patience=5),
-        epochs=50,
-        verbose=1,
-        batch_size=32,
-    ):
-        self.dl_model.reset_states()
-        self.dl_model.compile(loss=loss, optimizer=optimizer, metrics=metrics)
-        self.history = self.dl_model.fit(
-            self.X_train,
-            self.y_train,
-            epochs=epochs,
-            validation_data=(self.X_validation, self.y_validation),
-            verbose=verbose,
-            batch_size=batch_size,
-            callbacks=[callback],
-        )
-
-    def plot_training(self, figsize=(1200, 800)):
-        df_training_metrics = pd.DataFrame(self.history.history)
-        df_training_plotly = (
-            pd.DataFrame(df_training_metrics.stack())
-            .reset_index()
-            .sort_values(by=['level_1', 'level_0'])
-            .rename(
-                columns={'level_0': 'epochs', 'level_1': 'metric', 0: 'values'}
-            )
-        )
-        fig = px.line(
-            df_training_plotly,
-            x="epochs",
-            y="values",
-            color="metric",
-            line_group="metric",
-            hover_name="metric",
-        )
-        fig.show()
-
-    def get_validation_predictions(self):
-        df_predictions = pd.DataFrame(self.y_validation)
-        df_predictions['predictions'] = self.dl_model.predict(self.X_validation)[:, -1].round().astype(int)
-        self.df_validation_predictions = df_predictions
